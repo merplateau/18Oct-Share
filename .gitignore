@@ -1,0 +1,6 @@
+.DS_store
+
+**/build/
+
+**/lib/*
+!/lib/.gitkeep
