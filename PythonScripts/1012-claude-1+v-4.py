@@ -178,18 +178,62 @@ class DispersionSolver:
     def _Z_plus(self, z):
         return 1j * np.sqrt(np.pi) * special.wofz(z)
 
-    def _fun_A(self, w, k_par):
+    def _fun_A_plus1(self, w, k_par):
         w_eff = w + 1j * self.current_nu
-        zeta = (w_eff - k_par * self.current_v - self.w_c_i) / (k_par * self.v_th_par_i)
+        zeta = self._zeta_plus1(w, k_par)
         term1 = (self.T_perp_i - self.T_par_i) / (w_eff * self.T_par_i)
-        term2_factor = ((w_eff - k_par * self.current_v - self.w_c_i) * self.T_perp_i +
-                       self.w_c_i * self.T_par_i) / (k_par * self.v_th_par_i * self.T_par_i * w_eff)
+        # term2_factor = ((w_eff - k_par * self.current_v - self.w_c_i) * self.T_perp_i +
+        #                self.w_c_i * self.T_par_i) / (k_par * self.v_th_par_i * self.T_par_i * w_eff)
+        term2_factor = (zeta * self.T_perp_i/(w_eff * self.T_par_i) + self.w_c_i/(w_eff * k_par * self.v_th_par_i))
         return term1 + term2_factor * self._Z_plus(zeta)
+    
+    def _fun_A_minus1(self, w, k_par):
+        w_eff = w + 1j * self.current_nu
+        zeta = self._zeta_minus1(w, k_par)
+        term1 = (self.T_perp_i - self.T_par_i) / (w_eff * self.T_par_i)
+        term2_factor = (zeta * self.T_perp_i/(w_eff * self.T_par_i) - self.w_c_i/(w_eff * k_par * self.v_th_par_i))
+        return term1 + term2_factor * self._Z_plus(zeta)
+    
+    def _fun_B_zero(self, w, k_par):
+        w_eff = w + 1j * self.current_nu
+        zeta = self._zeta_zero(w, k_par)
+        term1 = (w_eff * self.T_perp_i - k_par * self.v_target)/(w_eff * k_par * self.T_par_i)
+        term2_factor = zeta * self.T_perp_i/(k_par * self.T_par_i)
+        return term1 + term2_factor * self._Z_plus(zeta)
+
+    def _zeta_plus1(self, w, k_par):
+        return (w + 1j*self.current_nu - k_par * self.current_v - self.w_c_i) / (k_par * self.v_th_par_i)
+    
+    def _zeta_minus1(self, w, k_par):
+        return (w + 1j*self.current_nu - k_par * self.current_v + self.w_c_i) / (k_par * self.v_th_par_i)
+    
+    def _zeta_zero(self, w, k_par):
+        return (w + 1j*self.current_nu - k_par * self.current_v) / (k_par * self.v_th_par_i)
+    
 
     def _hotPDE(self, k_par, w):
         if np.isclose(k_par, 0):
             return np.inf
-        return k_par**2 * self.c**2 - w**2 - self.w_p_i**2 * w * self._fun_A(w, k_par)
+        return k_par**2 * self.c**2 - w**2 - self.w_p_i**2 * w * self._fun_A_plus1(w, k_par)
+    
+    def _K_perp(self, k_par, w):
+        value = 1
+        value += self.w_p_i**2(self._fun_A_minus1(k_par,w) + self._fun_A_plus1(k_par,w))/(2*w)
+        return value
+    
+    def _K_phi(self, k_par, w):
+        value = 0
+        value += self.w_p_i**2(self._fun_A_minus1(k_par,w) - self._fun_A_plus1(k_par,w))/(2*w)
+        return value
+
+    def _K_par(self, k_par, w):
+        w_eff = w + 1j * self.current_nu
+        zeta = self._zeta_zero(k_par,w)
+        value = 1
+        value_1 = (2*self.w_p_i**2*w_eff)/(k_par * self.v_th_par_i**2 * w)
+        value_2 = self.v_target/w_eff + self._fun_B_zero(zeta)
+        value += value_1 * value_2
+        return value
 
     def _solve_single_k(self, k0, w):
         try:
