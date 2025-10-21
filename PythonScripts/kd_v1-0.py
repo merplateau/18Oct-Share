@@ -168,6 +168,16 @@ class DispersionFunction:
         其中 W(ζ) 是 Faddeeva 函数
         """
         return 1j * np.sqrt(np.pi) * special.wofz(zeta)
+    
+    @staticmethod
+    def plasma_dispersion_Z_reverse(zeta: complex) -> complex:
+        """
+        等离子体色散函数 Z_(ζ)
+        """
+        zeta = np.conj(zeta)
+        Z_val = 1j * np.sqrt(np.pi) * special.wofz(zeta)
+        Z_val = np.conj(Z_val)
+        return Z_val
 
     @staticmethod
     def compute_zeta_plus1(w: complex, k: complex, state: PlasmaState) -> complex:
@@ -232,7 +242,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_minus1(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_reverse(zeta)
 
         term1 = (p.T_perp - p.T_par) / (w_eff * p.T_par)
         term2_factor = (zeta * p.T_perp / (w_eff * p.T_par) -
@@ -1120,6 +1130,11 @@ def solve_dispersion_relation(
     K_g = disp_func.compute_K_g(w_final, k_final, state_final)
     K_par = disp_func.compute_K_par(w_final, k_final, state_final)
 
+    zeta_plus1_final = disp_func.compute_zeta_plus1(w_final, k_final, state_final)
+    zeta_minus1_final = disp_func.compute_zeta_minus1(w_final, k_final, state_final)
+    Z_plus1_final = disp_func.plasma_dispersion_Z(zeta_plus1_final)
+    Z_minus1_final = disp_func.plasma_dispersion_Z_reverse(zeta_minus1_final)
+
     print("\n" + "="*70)
     print("求解完成！")
     print("="*70)
@@ -1128,6 +1143,10 @@ def solve_dispersion_relation(
     print(f"阶段划分: {trans_indices}")
     print(f"\n最终解:")
     print(f"  波数 k = {np.real(k_final):.6f} + {np.imag(k_final):.6f}j")
+    print(f"  宗量 zeta_plus1 = {np.real(zeta_plus1_final):.6f} + {np.imag(zeta_plus1_final):.6f}j")
+    print(f"  等离子体函数 Z_plus1 = {np.real(Z_plus1_final):.6f} + {np.imag(Z_plus1_final):.6f}j")
+    print(f"  宗量 zeta_minus1 = {np.real(zeta_minus1_final):.6f} + {np.imag(zeta_minus1_final):.6f}j")
+    print(f"  等离子体函数 Z_minus1 = {np.real(Z_minus1_final):.6f} + {np.imag(Z_minus1_final):.6f}j")
     print(f"\n介电张量分量:")
     print(f"  K_⊥ = {np.real(K_perp):.6f} + {np.imag(K_perp):.6f}j")
     print(f"  K_g = {np.real(K_g):.6f} + {np.imag(K_g):.6f}j")
@@ -1211,11 +1230,11 @@ def solve_dispersion_relation(
 
 if __name__ == '__main__':
     # 物理参数
-    B0 = 2          # 磁场 [T]
+    B0 = 0.1          # 磁场 [T]
     n_p = 1e18        # 密度 [m^-3]
-    T_i_eV = 300.0      # 温度 [eV]
-    v_i = 10000.0       # 速度 [m/s]
-    nu_i = 1.8e5      # 碰撞频率 [rad/s]
+    T_i_eV = 30.0      # 温度 [eV]
+    v_i = 10.0       # 速度 [m/s]
+    nu_i = 1e5      # 碰撞频率 [rad/s]
     w_target = 3.3e6    # 目标频率 [rad/s]
     Z_number = 40     # 离子电荷数
 
@@ -1235,7 +1254,7 @@ if __name__ == '__main__':
 
     # 绘图（如果绘图模块可用）
     try:
-        from kdlogdraw_v1_0 import plot_all_results
+        from kdlogdraw_v1_999 import plot_all_results
         plot_all_results(results)
     except ImportError:
         print("\n注意：绘图模块 kdlogdraw_v1_0.py 未找到，跳过绘图")
