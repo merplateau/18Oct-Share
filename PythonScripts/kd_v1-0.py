@@ -170,13 +170,16 @@ class DispersionFunction:
         return 1j * np.sqrt(np.pi) * special.wofz(zeta)
     
     @staticmethod
-    def plasma_dispersion_Z_reverse(zeta: complex) -> complex:
+    def plasma_dispersion_Z_adapt(zeta: complex) -> complex:
         """
         等离子体色散函数 Z_(ζ)
         """
-        zeta = np.conj(zeta)
-        Z_val = 1j * np.sqrt(np.pi) * special.wofz(zeta)
-        Z_val = np.conj(Z_val)
+        if np.imag(zeta) >= 0:
+            Z_val = 1j * np.sqrt(np.pi) * special.wofz(zeta)
+        else:
+            zeta = np.conj(zeta)
+            Z_val = 1j * np.sqrt(np.pi) * special.wofz(zeta)
+            Z_val = np.conj(Z_val)
         return Z_val
 
     @staticmethod
@@ -230,6 +233,25 @@ class DispersionFunction:
                        state.w_c / (w_eff * k * state.v_th_par))
 
         return term1 + term2_factor * Z_val
+    
+    @staticmethod
+    def compute_A_plus1_4diel(w: complex, k: complex, state: PlasmaState) -> complex:
+        """
+        计算 A_+1 系数（用于色散关系）
+
+        物理意义：m=+1 回旋谐波对介电张量的贡献
+        """
+        p = state.params
+        w_eff = w + 1j * p.nu
+
+        zeta = DispersionFunction.compute_zeta_plus1(w, k, state)
+        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
+
+        term1 = (p.T_perp - p.T_par) / (w_eff * p.T_par)
+        term2_factor = (zeta * p.T_perp / (w_eff * p.T_par) +
+                       state.w_c / (w_eff * k * state.v_th_par))
+
+        return term1 + term2_factor * Z_val
 
     @staticmethod
     def compute_A_minus1(w: complex, k: complex, state: PlasmaState) -> complex:
@@ -242,7 +264,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_minus1(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z_reverse(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
 
         term1 = (p.T_perp - p.T_par) / (w_eff * p.T_par)
         term2_factor = (zeta * p.T_perp / (w_eff * p.T_par) -
@@ -261,9 +283,9 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_zero(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
 
-        # 注意：这里使用 p.v（当前值），因为是物理计算
+        # 注意：这里使用 p.v（当前值），因为是物理计算s
         term1 = (w_eff * p.T_perp - k * p.v * p.T_par) / (w_eff * k * p.T_par)
         term2_factor = zeta * p.T_perp / (k * p.T_par)
 
@@ -276,7 +298,7 @@ class DispersionFunction:
 
         K_⊥ = 1 + (ωp²/2ω) * (A_-1 + A_+1)
         """
-        A_plus1 = DispersionFunction.compute_A_plus1(w, k, state)
+        A_plus1 = DispersionFunction.compute_A_plus1_4diel(w, k, state)
         A_minus1 = DispersionFunction.compute_A_minus1(w, k, state)
 
         return 1.0 + (state.w_p**2 / (2 * w)) * (A_minus1 + A_plus1)
@@ -288,7 +310,7 @@ class DispersionFunction:
 
         K_g = (ωp²/2ω) * (A_-1 - A_+1)
         """
-        A_plus1 = DispersionFunction.compute_A_plus1(w, k, state)
+        A_plus1 = DispersionFunction.compute_A_plus1_4diel(w, k, state)
         A_minus1 = DispersionFunction.compute_A_minus1(w, k, state)
 
         return (state.w_p**2 / (2 * w)) * (A_minus1 - A_plus1)
@@ -1132,8 +1154,10 @@ def solve_dispersion_relation(
 
     zeta_plus1_final = disp_func.compute_zeta_plus1(w_final, k_final, state_final)
     zeta_minus1_final = disp_func.compute_zeta_minus1(w_final, k_final, state_final)
-    Z_plus1_final = disp_func.plasma_dispersion_Z(zeta_plus1_final)
-    Z_minus1_final = disp_func.plasma_dispersion_Z_reverse(zeta_minus1_final)
+    zeta_zero_final = disp_func.compute_zeta_zero(w_final, k_final, state_final)
+    Z_plus1_final = disp_func.plasma_dispersion_Z_adapt(zeta_plus1_final)
+    Z_minus1_final = disp_func.plasma_dispersion_Z_adapt(zeta_minus1_final)
+    Z_zero_final = disp_func.plasma_dispersion_Z_adapt(zeta_zero_final)
 
     print("\n" + "="*70)
     print("求解完成！")
@@ -1147,6 +1171,8 @@ def solve_dispersion_relation(
     print(f"  等离子体函数 Z_plus1 = {np.real(Z_plus1_final):.6f} + {np.imag(Z_plus1_final):.6f}j")
     print(f"  宗量 zeta_minus1 = {np.real(zeta_minus1_final):.6f} + {np.imag(zeta_minus1_final):.6f}j")
     print(f"  等离子体函数 Z_minus1 = {np.real(Z_minus1_final):.6f} + {np.imag(Z_minus1_final):.6f}j")
+    print(f"  宗量 zeta_zero = {np.real(zeta_zero_final):.6f} + {np.imag(zeta_zero_final):.6f}j")
+    print(f"  等离子体函数 Z_zero = {np.real(Z_zero_final):.6f} + {np.imag(Z_zero_final):.6f}j")
     print(f"\n介电张量分量:")
     print(f"  K_⊥ = {np.real(K_perp):.6f} + {np.imag(K_perp):.6f}j")
     print(f"  K_g = {np.real(K_g):.6f} + {np.imag(K_g):.6f}j")
