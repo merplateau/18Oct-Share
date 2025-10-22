@@ -181,6 +181,17 @@ class DispersionFunction:
             Z_val = 1j * np.sqrt(np.pi) * special.wofz(zeta)
             Z_val = np.conj(Z_val)
         return Z_val
+    
+    @staticmethod
+    def plasma_dispersion_Z_reverse(zeta: complex) -> complex:
+        """
+        等离子体色散函数 Z_(ζ)
+        """
+        
+        zeta = np.conj(zeta)
+        Z_val = 1j * np.sqrt(np.pi) * special.wofz(zeta)
+        Z_val = np.conj(Z_val)
+        return Z_val
 
     @staticmethod
     def compute_zeta_plus1(w: complex, k: complex, state: PlasmaState) -> complex:
@@ -245,7 +256,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_plus1(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z(zeta)
 
         term1 = (p.T_perp - p.T_par) / (w_eff * p.T_par)
         term2_factor = (zeta * p.T_perp / (w_eff * p.T_par) +
@@ -264,7 +275,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_minus1(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_reverse(zeta)
 
         term1 = (p.T_perp - p.T_par) / (w_eff * p.T_par)
         term2_factor = (zeta * p.T_perp / (w_eff * p.T_par) -
@@ -283,7 +294,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_zero(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_reverse(zeta)
 
         # 注意：这里使用 p.v（当前值），因为是物理计算s
         term1 = (w_eff * p.T_perp - k * p.v * p.T_par) / (w_eff * k * p.T_par)
@@ -298,7 +309,7 @@ class DispersionFunction:
 
         K_⊥ = 1 + (ωp²/2ω) * (A_-1 + A_+1)
         """
-        A_plus1 = DispersionFunction.compute_A_plus1_4diel(w, k, state)
+        A_plus1 = DispersionFunction.compute_A_plus1(w, k, state)
         A_minus1 = DispersionFunction.compute_A_minus1(w, k, state)
 
         return 1.0 + (state.w_p**2 / (2 * w)) * (A_minus1 + A_plus1)
@@ -310,7 +321,7 @@ class DispersionFunction:
 
         K_g = (ωp²/2ω) * (A_-1 - A_+1)
         """
-        A_plus1 = DispersionFunction.compute_A_plus1_4diel(w, k, state)
+        A_plus1 = DispersionFunction.compute_A_plus1(w, k, state)
         A_minus1 = DispersionFunction.compute_A_minus1(w, k, state)
 
         return (state.w_p**2 / (2 * w)) * (A_minus1 - A_plus1)
