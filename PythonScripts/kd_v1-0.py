@@ -275,7 +275,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_minus1(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z_reverse(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
 
         term1 = (p.T_perp - p.T_par) / (w_eff * p.T_par)
         term2_factor = (zeta * p.T_perp / (w_eff * p.T_par) -
@@ -294,7 +294,7 @@ class DispersionFunction:
         w_eff = w + 1j * p.nu
 
         zeta = DispersionFunction.compute_zeta_zero(w, k, state)
-        Z_val = DispersionFunction.plasma_dispersion_Z_reverse(zeta)
+        Z_val = DispersionFunction.plasma_dispersion_Z_adapt(zeta)
 
         # 注意：这里使用 p.v（当前值），因为是物理计算s
         term1 = (w_eff * p.T_perp - k * p.v * p.T_par) / (w_eff * k * p.T_par)
@@ -498,7 +498,7 @@ class AdaptiveStepController:
 
         # 自适应参数
         self.min_step_factor = 1e-6
-        self.max_step_factor = 10.0
+        self.max_step_factor = 3
         self.optimal_pred_error = 0.05
         self.fast_convergence_threshold = 8
         self.slow_convergence_threshold = 20
@@ -1242,6 +1242,11 @@ def solve_dispersion_relation(
         'K_g': K_g,
         'K_par': K_par,
 
+        # zeta 参数（最终值）
+        'zeta_plus1_final': zeta_plus1_final,
+        'zeta_minus1_final': zeta_minus1_final,
+        'zeta_zero_final': zeta_zero_final,
+
         # 衍生物理量历史
         'zeta_history': zeta_history,
         'phase_velocity_history': phase_velocity_history,
@@ -1267,11 +1272,11 @@ def solve_dispersion_relation(
 
 if __name__ == '__main__':
     # 物理参数
-    B0 = 0.1          # 磁场 [T]
-    n_p = 1e18        # 密度 [m^-3]
+    B0 = 0.15          # 磁场 [T]
+    n_p = 1e17        # 密度 [m^-3]
     T_i_eV = 30.0      # 温度 [eV]
-    v_i = 10.0       # 速度 [m/s]
-    nu_i = 1e5      # 碰撞频率 [rad/s]
+    v_i = 80000.0       # 速度 [m/s]
+    nu_i = 1e2      # 碰撞频率 [rad/s]
     w_target = 3.3e6    # 目标频率 [rad/s]
     Z_number = 40     # 离子电荷数
 
@@ -1291,7 +1296,7 @@ if __name__ == '__main__':
 
     # 绘图（如果绘图模块可用）
     try:
-        from kdlogdraw_v1_999 import plot_all_results
+        from kdlogdraw_v1_0 import plot_all_results
         plot_all_results(results)
     except ImportError:
         print("\n注意：绘图模块 kdlogdraw_v1_0.py 未找到，跳过绘图")
