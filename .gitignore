@@ -1,5 +1,8 @@
 .DS_store
 
+.png
+*.pdf
+
 **/build/
 
 **/lib/*

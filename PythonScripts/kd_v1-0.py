@@ -1272,11 +1272,11 @@ def solve_dispersion_relation(
 
 if __name__ == '__main__':
     # 物理参数
-    B0 = 0.15          # 磁场 [T]
-    n_p = 1e17        # 密度 [m^-3]
-    T_i_eV = 30.0      # 温度 [eV]
-    v_i = 80000.0       # 速度 [m/s]
-    nu_i = 1e2      # 碰撞频率 [rad/s]
+    B0 = 1.0          # 磁场 [T]
+    n_p = 1e19        # 密度 [m^-3]
+    T_i_eV = 3.0      # 温度 [eV]
+    v_i = 1000.0       # 速度 [m/s]
+    nu_i = 3e5      # 碰撞频率 [rad/s]
     w_target = 3.3e6    # 目标频率 [rad/s]
     Z_number = 40     # 离子电荷数
 

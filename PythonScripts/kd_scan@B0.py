@@ -39,8 +39,8 @@ B0_values = np.linspace(1.2, 1.5, 300)  # 从 0.5 T 到 2.0 T，20个点
 # 固定物理参数（与 kd_v1-0.py 保持一致）
 n_p = 1e18        # 密度 [m^-3]
 T_i_eV = 3     # 温度 [eV]
-v_i = 20000.0        # 速度 [m/s]
-nu_i = 5e4        # 碰撞频率 [rad/s]
+v_i = 100.0        # 速度 [m/s]
+nu_i = 1e4        # 碰撞频率 [rad/s]
 w_target = 3.3e6  # 目标频率 [rad/s]
 Z_number = 40     # 离子电荷数
 
