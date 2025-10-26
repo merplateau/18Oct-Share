@@ -1,7 +1,6 @@
 .DS_store
 
-.png
-*.pdf
+*.png
 
 **/build/
 
