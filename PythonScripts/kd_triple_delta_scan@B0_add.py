@@ -40,7 +40,7 @@ B0_values = np.linspace(0.4, 0.75, 300)  # 从 0.8 T 到 1.5 T，300个点
 PARAMS_RANGE = {
     'density': (2e16, 1e17),        # 密度范围 [m^-3]
     'temperature': (3, 3),         # 温度范围 [eV]
-    'velocity': (60000, 20000),      # 速度范围 [m/s]
+    'velocity': (60000, 10000),      # 速度范围 [m/s]
     'collision': (1e4, 1e4)         # 碰撞频率范围 [rad/s]
 }
 
@@ -76,6 +76,7 @@ q_i = e  # 离子电荷
 # 存储结果
 k_final_array = []
 delta_array = []
+zeta_plus1_array = []
 successful_B0 = []
 successful_n_p = []
 successful_T_i = []
@@ -120,6 +121,10 @@ for i, B0 in enumerate(B0_values):
         delta = (w_target - k_par * v_i - w_ci) / w_ci
         delta_array.append(delta)
 
+        # 提取 zeta_plus1
+        zeta_plus1 = results['zeta_plus1_final']
+        zeta_plus1_array.append(zeta_plus1)
+
         # 记录成功的数据点
         successful_B0.append(B0)
         successful_n_p.append(n_p)
@@ -139,10 +144,50 @@ print(f"\n扫描完成！成功点数: {len(successful_B0)}/{len(B0_values)}")
 successful_B0 = np.array(successful_B0)
 k_final_array = np.array(k_final_array)
 delta_array = np.array(delta_array)
+zeta_plus1_array = np.array(zeta_plus1_array)
 successful_n_p = np.array(successful_n_p)
 successful_T_i = np.array(successful_T_i)
 successful_v_i = np.array(successful_v_i)
 successful_nu_i = np.array(successful_nu_i)
+
+# ============================================================================
+# 计算 dk/dz 相关量
+# ============================================================================
+
+# 物理空间参数：变化发生在 z=0 到 z=0.3m
+z_start = 0.0  # m
+z_end = 0.3    # m
+delta_z = z_end - z_start
+
+# 磁场从 z=0 线性下降到 z=0.3
+# z=0: B0 = B0_max (0.75 T)
+# z=0.3: B0 = B0_min (0.4 T)
+B0_at_z0 = B0_values[-1]  # 0.75 T
+B0_at_z03 = B0_values[0]  # 0.4 T
+dB0_dz = (B0_at_z03 - B0_at_z0) / delta_z  # T/m (负值，因为下降)
+
+print(f"\n物理空间信息:")
+print(f"  磁场变化范围: z = {z_start} m 到 z = {z_end} m")
+print(f"  B0(z=0) = {B0_at_z0:.3f} T")
+print(f"  B0(z=0.3) = {B0_at_z03:.3f} T")
+print(f"  dB0/dz = {dB0_dz:.3f} T/m")
+
+# 提取 Re(k)
+k_real = np.real(k_final_array)
+
+# 计算 d Re(k) / dB0 使用后向差分
+dk_dB0 = np.zeros_like(k_real)
+dk_dB0[0] = 0  # 第一个点无法计算后向差分
+for i in range(1, len(k_real)):
+    dk_dB0[i] = (k_real[i] - k_real[i-1]) / (successful_B0[i] - successful_B0[i-1])
+
+# 计算 d Re(k) / dz = (d Re(k) / dB0) * (dB0 / dz)
+dk_dz = dk_dB0 * dB0_dz
+
+# 计算 (1/Re(k)^2) * (d Re(k) / dz)
+# 避免除以零
+k_real_safe = np.where(np.abs(k_real) < 1e-15, 1e-15, k_real)
+normalized_dk_dz = (1.0 / k_real_safe**2) * dk_dz
 
 # ============================================================================
 # 绘图函数
@@ -315,6 +360,123 @@ def plot_delta_vs_B0(B0_data, delta_data, w, Z, params_range):
     plt.close()
 
 
+def plot_zeta_plus1_vs_B0(B0_data, zeta_plus1_data, w, Z):
+    """
+    zeta_plus1 vs B0 绘图函数
+
+    参数:
+        B0_data: 磁场强度数据
+        zeta_plus1_data: zeta_plus1数据（复数）
+        w: 目标频率 [rad/s]
+        Z: 离子电荷数
+    """
+    # 创建figure
+    plt.figure(figsize=(5, 5))
+
+    # 颜色: 蓝色(实部), 红色(虚部)
+    color_real = '#1055C9'
+    color_imag = '#BF092F'
+
+    # 绘制实部和虚部
+    plt.plot(B0_data, np.real(zeta_plus1_data), '-', color=color_real,
+            linewidth=2, markersize=0, label=r'Re($\zeta_{+1}$)')
+    plt.plot(B0_data, np.imag(zeta_plus1_data), '-', color=color_imag,
+            linewidth=2, markersize=0, label=r'Im($\zeta_{+1}$)')
+
+    # 计算回旋共振磁场强度
+    B_ci = None
+    if w is not None and Z is not None:
+        m_p = 1.67e-27
+        e = 1.602e-19
+        m_i = Z * m_p
+        q_i = e
+        B_ci = w * m_i / q_i
+
+        B_min = np.min(B0_data)
+        B_max = np.max(B0_data)
+        if B_min <= B_ci <= B_max:
+            plt.axvline(x=B_ci, color='gray', linestyle='--', linewidth=1.5, alpha=0.7)
+
+    # 设置标签
+    plt.xlabel(r'$B_0$ [T]', fontsize=20)
+    plt.ylabel(r'$\zeta_{+1}$', fontsize=20)
+
+    # 刻度字体和坐标轴反转
+    plt.tick_params(labelsize=20)
+    plt.gca().invert_xaxis()
+
+    # 图例样式（强制左上角）
+    legend = plt.legend(fontsize=12, frameon=True, fancybox=False,
+                       edgecolor='black', framealpha=1.0, loc='upper left')
+    legend.get_frame().set_linewidth(1.0)
+
+    # 其他设置
+    plt.grid(False)
+    plt.tight_layout()
+
+    # 保存图片
+    plt.savefig('zeta_plus1_vs_B0.png', dpi=300)
+    print(f"  ✓ 已保存: zeta_plus1_vs_B0.png")
+    plt.close()
+
+
+def plot_normalized_dk_dz_vs_B0(B0_data, normalized_dk_dz_data, w, Z):
+    """
+    归一化波数空间导数 vs B0 绘图函数
+
+    绘制 (1/Re(k)^2) * (d Re(k)/dz)
+
+    参数:
+        B0_data: 磁场强度数据
+        normalized_dk_dz_data: (1/Re(k)^2) * (d Re(k)/dz) 数据
+        w: 目标频率 [rad/s]
+        Z: 离子电荷数
+    """
+    # 创建figure
+    plt.figure(figsize=(5, 5))
+
+    # 颜色: 蓝色
+    color = '#1055C9'
+
+    # 绘制归一化导数
+    plt.plot(B0_data, normalized_dk_dz_data, '-', color=color,
+            linewidth=2, markersize=0)
+
+    # 计算回旋共振磁场强度
+    B_ci = None
+    if w is not None and Z is not None:
+        m_p = 1.67e-27
+        e = 1.602e-19
+        m_i = Z * m_p
+        q_i = e
+        B_ci = w * m_i / q_i
+
+        B_min = np.min(B0_data)
+        B_max = np.max(B0_data)
+        if B_min <= B_ci <= B_max:
+            plt.axvline(x=B_ci, color='gray', linestyle='--', linewidth=1.5, alpha=0.7)
+
+    # 添加水平参考线 y=0
+    plt.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
+
+    # 设置标签
+    plt.xlabel(r'$B_0$ [T]', fontsize=20)
+    plt.ylabel(r'$\frac{1}{\mathrm{Re}(k)^2}\frac{d\mathrm{Re}(k)}{dz}$ [m$^{-1}$]', fontsize=20)
+
+    # 刻度字体和坐标轴反转
+    plt.tick_params(labelsize=20)
+    plt.gca().invert_xaxis()
+
+    # 其他设置
+    plt.grid(False)
+    plt.tight_layout()
+
+    # 保存图片
+    plt.savefig('normalized_dk_dz_vs_B0.png', dpi=300)
+    print(f"  ✓ 已保存: normalized_dk_dz_vs_B0.png")
+    plt.close()
+
+
 # ============================================================================
 # 绘图
 # ============================================================================
@@ -338,12 +500,30 @@ plot_delta_vs_B0(
     params_range=PARAMS_RANGE
 )
 
+# 图3：zeta_plus1 vs B0
+plot_zeta_plus1_vs_B0(
+    B0_data=successful_B0,
+    zeta_plus1_data=zeta_plus1_array,
+    w=w_target,
+    Z=Z_number
+)
+
+# 图4：归一化 dk/dz vs B0
+plot_normalized_dk_dz_vs_B0(
+    B0_data=successful_B0,
+    normalized_dk_dz_data=normalized_dk_dz,
+    w=w_target,
+    Z=Z_number
+)
+
 print("\n" + "="*70)
 print("所有图像已生成完成！")
 print("="*70)
 print("输出文件:")
 print("  1. k_vs_B0.png - 波数随磁场变化（参数连续变化）")
 print("  2. delta_vs_B0.png - δ参数随磁场变化（参数连续变化，含冷等离子体背景）")
+print("  3. zeta_plus1_vs_B0.png - ζ_+1参数随磁场变化（参数连续变化）")
+print("  4. normalized_dk_dz_vs_B0.png - (1/Re(k)²)·(dRe(k)/dz) 随磁场变化")
 print("="*70)
 
 plt.show()
